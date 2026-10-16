@@ -303,6 +303,15 @@ describe('discoverSessionApiDataSchema', () => {
     }
   );
 
+  it('rejects a histogram distribution', () => {
+    expect(() =>
+      discoverSessionApiDataSchema.parse({
+        title: 'Histogram distribution',
+        tabs: [{ ...metricsTab, histogram_percentile: 'distribution' }],
+      })
+    ).toThrow();
+  });
+
   it('rejects an unsupported metrics histogram percentile', () => {
     expect(() =>
       discoverSessionApiDataSchema.parse({
@@ -965,6 +974,18 @@ describe('discoverSessionInternalDataSchema', () => {
       index_pattern: 'logs-*',
     },
   };
+
+  it('accepts a histogram distribution that the public schema rejects', () => {
+    const data = {
+      title: 'Histogram distribution',
+      tabs: [{ ...metricsTab, histogram_percentile: 'distribution' }],
+    };
+
+    expect(discoverSessionInternalDataSchema.parse(data).tabs[0]).toMatchObject({
+      histogram_percentile: 'distribution',
+    });
+    expect(discoverSessionApiDataSchema.safeParse(data).success).toBe(false);
+  });
 
   it('preserves an inline ID without allowing it in the public schema', () => {
     const dataSource = { ...inlineTab.data_source, id: 'Legacy:Inline-ID' };

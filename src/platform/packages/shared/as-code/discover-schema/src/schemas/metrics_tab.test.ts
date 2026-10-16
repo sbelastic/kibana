@@ -38,6 +38,15 @@ describe('discoverSessionApiMetricsTabTypeStateSchema', () => {
     ).toMatchObject({ grid_sort_field: 'recency', grid_sort_direction: 'desc' });
   });
 
+  it('rejects a histogram distribution', () => {
+    expect(() =>
+      discoverSessionApiMetricsTabTypeStateSchema.parse({
+        ...metricsTabTypeState,
+        histogram_percentile: 'distribution',
+      })
+    ).toThrow();
+  });
+
   it('rejects an unknown grid sort field', () => {
     expect(() =>
       discoverSessionApiMetricsTabTypeStateSchema.parse({

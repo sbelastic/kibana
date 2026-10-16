@@ -15,9 +15,21 @@ import {
   discoverSessionApiEsqlTabSchema,
   discoverSessionApiMetricsTabSchema,
 } from '@kbn/as-code-discover-schema';
-import { MAX_DISCOVER_SESSION_TABS } from '@kbn/discover-session-constants';
+import {
+  MAX_DISCOVER_SESSION_TABS,
+  METRICS_GRID_HISTOGRAM_VISUALIZATIONS,
+} from '@kbn/discover-session-constants';
 import { MAX_SAVED_OBJECT_ID_LENGTH } from '@kbn/core-saved-objects-server';
 import { discoverSessionApiResponseSchema, discoverSessionGetResponseSchema } from './schema';
+
+/** Keeps the heatmap selection off the public session schema while the feature is still changing. */
+const discoverSessionInternalMetricsTabSchema = discoverSessionApiMetricsTabSchema.extend({
+  histogram_percentile: z.enum(METRICS_GRID_HISTOGRAM_VISUALIZATIONS).meta({
+    description:
+      'How histogram metric fields are displayed. `distribution` shows a heatmap. ' +
+      'A percentile value shows that percentile as a series.',
+  }),
+});
 
 const internalTabSchema = z.union([
   discoverSessionApiClassicTabSchema.extend({
@@ -29,7 +41,7 @@ const internalTabSchema = z.union([
     ]),
   }),
   discoverSessionApiEsqlTabSchema,
-  discoverSessionApiMetricsTabSchema,
+  discoverSessionInternalMetricsTabSchema,
 ]);
 
 /** Uses the public session format while preserving inline Data View IDs for Discover. */

@@ -23,7 +23,7 @@ import type { DiscoverSessionTab } from '@kbn/saved-search-plugin/common';
 import type { DiscoverSessionTabAttributes } from '@kbn/saved-search-plugin/server';
 import { isDiscoverSessionEsqlTab } from './type_guards';
 import { fromStoredSearchAndTable } from './search_and_table_mapping';
-import { fromStoredTabTypeState } from './tab_type_state';
+import { fromStoredTabTypeState, type DiscoverSessionInternalApiTab } from './tab_type_state';
 
 // "Stored" names the saved tab format, not a persistence step (see search_and_table_mapping.ts).
 
@@ -47,7 +47,9 @@ type StoredSessionSettings = Pick<
 >;
 
 /** Maps API display, time, and query settings to tab fields, including inline Data View usage. */
-export const toStoredSessionSettings = (tab: DiscoverSessionApiTab): StoredSessionSettings => ({
+export const toStoredSessionSettings = (
+  tab: DiscoverSessionInternalApiTab
+): StoredSessionSettings => ({
   hideChart: tab.hide_chart,
   hideTable: tab.hide_table,
   ...('hide_aggregated_preview' in tab &&
@@ -109,16 +111,31 @@ export const fromStoredEsqlSessionSettings = (
 });
 
 /** Adds saved type settings, ignoring Metrics settings on non-ES|QL tabs. */
-export const applySessionTabTypeState = (
+export function applySessionTabTypeState(
   apiTab: TabWithoutTypeState,
-  tabTypeState: DiscoverSessionTabAttributes['tabTypeState']
-): DiscoverSessionApiTab => {
+  tabTypeState: DiscoverSessionTabAttributes['tabTypeState'],
+  options: { includeDistribution: true }
+): DiscoverSessionInternalApiTab;
+export function applySessionTabTypeState(
+  apiTab: TabWithoutTypeState,
+  tabTypeState: DiscoverSessionTabAttributes['tabTypeState'],
+  options?: { includeDistribution?: false }
+): DiscoverSessionApiTab;
+export function applySessionTabTypeState(
+  apiTab: TabWithoutTypeState,
+  tabTypeState: DiscoverSessionTabAttributes['tabTypeState'],
+  options?: { includeDistribution?: boolean }
+): DiscoverSessionInternalApiTab {
   if (!isDiscoverSessionEsqlTab(apiTab)) {
     return { ...apiTab, type: DiscoverTabType.Default };
   }
 
+  if (options?.includeDistribution) {
+    return { ...apiTab, ...fromStoredTabTypeState(tabTypeState, { includeDistribution: true }) };
+  }
+
   return { ...apiTab, ...fromStoredTabTypeState(tabTypeState) };
-};
+}
 
 /**
  * Maps session search and table state to public API fields, keeping pinned conditions and

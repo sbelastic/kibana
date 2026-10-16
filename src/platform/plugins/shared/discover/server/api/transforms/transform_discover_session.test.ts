@@ -1280,6 +1280,56 @@ describe('discover session API transforms', () => {
       expect(writtenBack.tabs[0].attributes.tabTypeState).toEqual(savedTabTypeState);
     });
 
+    it('keeps a histogram distribution on the internal API and falls back on the public API', () => {
+      const [, esqlTab] = discoverSessionAttributes.tabs;
+      const savedTabTypeState = esqlTab.attributes.tabTypeState;
+      if (savedTabTypeState?.type !== DiscoverTabType.Metrics) {
+        throw new Error('Expected the fixture tab to store metrics settings');
+      }
+      const savedMetricsSession = {
+        ...discoverSessionAttributes,
+        tabs: [
+          {
+            ...esqlTab,
+            attributes: {
+              ...esqlTab.attributes,
+              tabTypeState: {
+                ...savedTabTypeState,
+                histogramPercentile: 'distribution' as const,
+              },
+            },
+          },
+        ],
+      };
+
+      const publicSession = transformDiscoverSessionOut(savedMetricsSession);
+      const internalSession = transformInternalDiscoverSessionOut(savedMetricsSession);
+
+      expect(publicSession.sessionState.tabs[0]).toMatchObject({ histogram_percentile: 'p95' });
+      expect(publicSession.warnings).toEqual([
+        {
+          type: 'dropped_property',
+          tab_id: esqlTab.id,
+          key: 'histogram_percentile',
+          value: 'distribution',
+          message:
+            'The histogram visualization "distribution" is not available on this API. The response uses "p95".',
+        },
+      ]);
+      expect(discoverSessionApiDataSchema.parse(publicSession.sessionState)).toBeTruthy();
+      expect(internalSession.sessionState.tabs[0]).toMatchObject({
+        histogram_percentile: 'distribution',
+      });
+      expect(internalSession.warnings).toEqual([]);
+      expect(
+        discoverSessionInternalDataSchema.parse(internalSession.sessionState).tabs[0]
+      ).toMatchObject({ histogram_percentile: 'distribution' });
+      expect(
+        transformInternalDiscoverSessionIn(internalSession.sessionState).attributes.tabs[0]
+          .attributes.tabTypeState
+      ).toMatchObject({ histogramPercentile: 'distribution' });
+    });
+
     it('ignores saved metrics state on a classic tab while preserving its classic settings', () => {
       const [classicTab, metricsTab] = discoverSessionAttributes.tabs;
 
