@@ -19,6 +19,7 @@ import { injectReferences, parseSearchSourceJSON } from '@kbn/data-plugin/common
 import type { SerializedSearchSourceFields } from '@kbn/data-plugin/common';
 import { isOfAggregateQueryType } from '@kbn/es-query';
 import { AS_CODE_DATA_VIEW_SPEC_TYPE } from '@kbn/as-code-data-views-schema';
+import { DiscoverTabType } from '@kbn/discover-session-constants';
 import type { DiscoverSessionInternalData } from '../internal_schema';
 import type { DiscoverSessionWarning } from '../schema';
 import { transformControlPanelsOut } from './transform_control_panels';
@@ -30,11 +31,15 @@ import {
   pinnedFiltersToAppFilters,
 } from '../../../common/session/session_tab_mapping';
 import { fromStoredSearchAndTable } from '../../../common/session/search_and_table_mapping';
+import {
+  PUBLIC_HISTOGRAM_PERCENTILE_FOR_DISTRIBUTION,
+  type DiscoverSessionInternalApiTab,
+} from '../../../common/session/tab_type_state';
 import { isDiscoverSessionEsqlTab } from '../../../common/session/type_guards';
 import { toApiVisContext } from '../../../common/session/vis_context';
 
-interface ConvertedSessionTab {
-  tab: DiscoverSessionApiTab;
+interface ConvertedSessionTab<TTab = DiscoverSessionApiTab> {
+  tab: TTab;
   warnings: DiscoverSessionWarning[];
 }
 
@@ -50,7 +55,7 @@ export const transformDiscoverSessionOut = (
       searchSource
     );
 
-    return fromStoredSessionTab(storedTab, searchAndTableFields);
+    return fromStoredSessionTab(storedTab, searchAndTableFields, { includeDistribution: false });
   });
 
   return assembleApiSession(attributes, references, convertedTabs);
@@ -74,7 +79,9 @@ export const transformInternalDiscoverSessionOut = (
     }
 
     const searchAndTableFields = fromStoredSearchAndTable(storedTab.attributes, searchSource);
-    const converted = fromStoredSessionTab(storedTab, searchAndTableFields);
+    const converted = fromStoredSessionTab(storedTab, searchAndTableFields, {
+      includeDistribution: true,
+    });
     const { tab } = converted;
 
     if (
@@ -110,10 +117,21 @@ const readSessionSearchSource = (
 };
 
 /** Completes mapped search and table fields with session settings, chart, controls, and tab type. */
-const fromStoredSessionTab = (
+function fromStoredSessionTab(
   tab: DiscoverSessionAttributes['tabs'][number],
-  searchAndTableFields: DiscoverSessionApiTabBase
-): ConvertedSessionTab => {
+  searchAndTableFields: DiscoverSessionApiTabBase,
+  options: { includeDistribution: true }
+): ConvertedSessionTab<DiscoverSessionInternalApiTab>;
+function fromStoredSessionTab(
+  tab: DiscoverSessionAttributes['tabs'][number],
+  searchAndTableFields: DiscoverSessionApiTabBase,
+  options: { includeDistribution: false }
+): ConvertedSessionTab;
+function fromStoredSessionTab(
+  tab: DiscoverSessionAttributes['tabs'][number],
+  searchAndTableFields: DiscoverSessionApiTabBase,
+  options: { includeDistribution: boolean }
+): ConvertedSessionTab<DiscoverSessionApiTab | DiscoverSessionInternalApiTab> {
   const sessionSettings = isDiscoverSessionEsqlTab(searchAndTableFields)
     ? fromStoredEsqlSessionSettings(tab.attributes)
     : fromStoredClassicSessionSettings(tab.attributes);
@@ -133,17 +151,44 @@ const fromStoredSessionTab = (
     ...(visContext !== undefined && { vis_context: visContext }),
     ...(controlPanels !== undefined && { control_panels: controlPanels }),
   };
-  const typedTab = applySessionTabTypeState(sessionTab, tab.attributes.tabTypeState);
+  const includeDistribution = options.includeDistribution;
+  const typedTab = includeDistribution
+    ? applySessionTabTypeState(sessionTab, tab.attributes.tabTypeState, {
+        includeDistribution: true,
+      })
+    : applySessionTabTypeState(sessionTab, tab.attributes.tabTypeState);
+  const storedTabTypeState = tab.attributes.tabTypeState;
+  const omittedDistribution =
+    !includeDistribution &&
+    storedTabTypeState?.type === DiscoverTabType.Metrics &&
+    storedTabTypeState.histogramPercentile === 'distribution';
 
-  return { tab: typedTab, warnings };
-};
+  return {
+    tab: typedTab,
+    warnings: omittedDistribution
+      ? [
+          ...warnings,
+          {
+            type: 'dropped_property',
+            tab_id: tab.id,
+            key: 'histogram_percentile',
+            value: 'distribution',
+            message: `The histogram visualization "distribution" is not available on this API. The response uses "${PUBLIC_HISTOGRAM_PERCENTILE_FOR_DISTRIBUTION}".`,
+          },
+        ]
+      : warnings,
+  };
+}
 
 /** Combines converted tabs and their warnings in the original tab order. */
-const assembleApiSession = (
+const assembleApiSession = <TTab extends DiscoverSessionApiTab | DiscoverSessionInternalApiTab>(
   { title, description }: DiscoverSessionAttributes,
   references: SavedObjectReference[],
-  convertedTabs: ConvertedSessionTab[]
-): { sessionState: DiscoverSessionApiData; warnings: DiscoverSessionWarning[] } => {
+  convertedTabs: Array<ConvertedSessionTab<TTab>>
+): {
+  sessionState: Omit<DiscoverSessionApiData, 'tabs'> & { tabs: TTab[] };
+  warnings: DiscoverSessionWarning[];
+} => {
   const { tags } = toAsCodeTags(references);
   const sessionState = {
     title,

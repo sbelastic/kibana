@@ -10,12 +10,12 @@
 import { AS_CODE_DATA_VIEW_SPEC_TYPE } from '@kbn/as-code-data-views-schema';
 import { ESQL_TYPE } from '@kbn/data-view-utils';
 import { get, isUndefined, omitBy } from 'lodash';
-import type { DiscoverSessionApiTab } from '@kbn/as-code-discover-schema';
+import type { DiscoverSessionInternalApiTab } from './tab_type_state';
 import type { StoredVisContextRequestData } from './vis_context';
 
 /** Rebuilds the chart fingerprint, using the supplied ID for an inline Data View. */
 export const getVisContextRequestData = (
-  tab: DiscoverSessionApiTab,
+  tab: DiscoverSessionInternalApiTab,
   inlineDataViewId?: string
 ): StoredVisContextRequestData => {
   const breakdownField = tab.breakdown_field || undefined;

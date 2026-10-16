@@ -31,6 +31,7 @@ import type {
 import {
   discoverSessionInternalDataSchema,
   type DiscoverSessionInternalData,
+  type DiscoverSessionInternalResponse,
 } from '../../server/api/internal_schema';
 import type { DiscoverSessionApiResponse } from '../../server';
 import { assignSessionDataViewIds } from '../application/main/state_management/utils/assign_session_data_view_ids';
@@ -470,6 +471,37 @@ describe('Discover session conversion and UI preparation', () => {
       gridSortDirection: 'desc',
     });
     expect(toDiscoverSessionApiData(session)).toStrictEqual(metricsResponse.data);
+  });
+
+  it('keeps a histogram distribution on the internal session request', () => {
+    const data = discoverSessionInternalDataSchema.parse({
+      ...response.data,
+      tabs: [
+        {
+          ...esqlApiTab,
+          type: DiscoverTabType.Metrics,
+          dimensions: ['host.name'],
+          search_term: 'cpu',
+          counter_aggregation: 'max',
+          gauge_aggregation: 'min',
+          histogram_percentile: 'distribution',
+        },
+      ],
+    });
+    const metricsResponse: DiscoverSessionInternalResponse = {
+      ...response,
+      data,
+    };
+
+    const session = fromDiscoverSessionApiResponse(metricsResponse);
+
+    expect(session.tabs[0].tabTypeState).toMatchObject({ histogramPercentile: 'distribution' });
+    expect(toDiscoverSessionApiData(session).tabs[0]).toMatchObject({
+      histogram_percentile: 'distribution',
+    });
+    expect(
+      discoverSessionInternalDataSchema.parse(toDiscoverSessionApiData(session)).tabs[0]
+    ).toMatchObject({ histogram_percentile: 'distribution' });
   });
 
   it('ignores Metrics settings on a classic tab when building a save request', () => {

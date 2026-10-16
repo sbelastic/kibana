@@ -8,7 +8,7 @@
  */
 
 import { toStoredTags } from '@kbn/as-code-shared-transforms';
-import type { DiscoverSessionApiData, DiscoverSessionApiTab } from '@kbn/as-code-discover-schema';
+import type { DiscoverSessionApiData } from '@kbn/as-code-discover-schema';
 import type { SavedObjectReference } from '@kbn/core/server';
 import type { StoredDiscoverSession } from '@kbn/saved-search-plugin/common';
 import type { DiscoverSessionAttributes } from '@kbn/saved-search-plugin/server';
@@ -18,7 +18,10 @@ import { serializeEsqlControls } from '../../../common/session/control_panels';
 import { getVisContextRequestData } from '../../../common/session/get_vis_context_request_data';
 import { toStoredSearchAndTableAttributes } from '../../../common/session/search_and_table_mapping';
 import { toStoredSessionSettings } from '../../../common/session/session_tab_mapping';
-import { toStoredTabTypeState } from '../../../common/session/tab_type_state';
+import {
+  toStoredTabTypeState,
+  type DiscoverSessionInternalApiTab,
+} from '../../../common/session/tab_type_state';
 import { fromApiVisContext } from '../../../common/session/vis_context';
 
 interface StoredSessionTabWithReferences {
@@ -53,7 +56,7 @@ export const transformInternalDiscoverSessionIn = (
 
 /** Converts an API tab to saved attributes and references, including its chart and controls. */
 const toStoredSessionTab = (
-  tab: DiscoverSessionApiTab,
+  tab: DiscoverSessionInternalApiTab,
   inlineDataViewId?: string
 ): StoredSessionTabWithReferences => {
   const { attributes, references } = toStoredSearchAndTableAttributes(tab, {

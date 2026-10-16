@@ -1272,6 +1272,50 @@ describe('search embeddable transform utils', () => {
       expect(fromStoredSearchEmbeddableByValue(state)).toEqual(apiState);
     });
 
+    it('reads a stored histogram distribution as the public percentile', () => {
+      const apiState: DiscoverSessionEmbeddableByValueState = {
+        title: 'Metrics panel',
+        description: '',
+        tabs: [
+          {
+            type: DiscoverTabType.Metrics,
+            dimensions: ['host.name'],
+            search_term: 'cpu',
+            counter_aggregation: 'max',
+            gauge_aggregation: 'avg',
+            histogram_percentile: 'p99',
+            column_order: [],
+            sort: [],
+            data_source: { type: AS_CODE_ESQL_DATA_SOURCE_TYPE, query: 'TS metrics-*' },
+          },
+        ],
+      };
+      const { state } = toStoredSearchEmbeddableByValue(apiState);
+      const [storedTab] = state.attributes.tabs;
+      const storedWithDistribution = {
+        ...state,
+        attributes: {
+          ...state.attributes,
+          tabs: [
+            {
+              ...storedTab,
+              attributes: {
+                ...storedTab.attributes,
+                tabTypeState: {
+                  ...storedMetricsTabTypeState,
+                  histogramPercentile: 'distribution' as const,
+                },
+              },
+            },
+          ],
+        },
+      };
+
+      expect(fromStoredSearchEmbeddableByValue(storedWithDistribution).tabs[0]).toMatchObject({
+        histogram_percentile: 'p95',
+      });
+    });
+
     it('does not store profile state for an explicit default tab type', () => {
       const apiState: DiscoverSessionEmbeddableByValueState = {
         title: 'Default panel',

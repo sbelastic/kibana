@@ -107,7 +107,7 @@ describe('Serialization utils', () => {
     search_term: metricsTabTypeState.searchTerm,
     counter_aggregation: metricsTabTypeState.counterAggregation,
     gauge_aggregation: metricsTabTypeState.gaugeAggregation,
-    histogram_percentile: metricsTabTypeState.histogramPercentile,
+    histogram_percentile: 'p99',
     sort: [],
     data_source: {
       type: AS_CODE_ESQL_DATA_SOURCE_TYPE,

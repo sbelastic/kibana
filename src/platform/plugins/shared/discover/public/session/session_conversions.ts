@@ -130,7 +130,8 @@ const fromDiscoverTabToApiTab = (tab: DiscoverSessionTab): DiscoverSessionClient
       ...searchAndTableFields,
       ...sessionSettings,
     },
-    tab.tabTypeState
+    tab.tabTypeState,
+    { includeDistribution: true }
   );
   const visContext = getApiVisContext(tab.visContext);
   const controlPanels = deserializeEsqlControls(tab.controlGroupJson);
